@@ -19,6 +19,10 @@
             padding: 10px;
             text-align: left;
         }
+        #error {
+            color: red;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -27,6 +31,7 @@
     <button onclick="convertToJson()">Convert</button>
     <button onclick="downloadJson()">Download JSON</button>
     <pre id="output"></pre>
+    <div id="error"></div>
     
     <script>
         let jsonData = null;
@@ -34,9 +39,12 @@
         function convertToJson() {
             const fileInput = document.getElementById('csvFile');
             const output = document.getElementById('output');
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = "";
+            output.textContent = "";
 
             if (!fileInput.files.length) {
-                alert("Please select a CSV file.");
+                errorDiv.textContent = "Please select a CSV file.";
                 return;
             }
 
@@ -46,14 +54,37 @@
             reader.onload = function(event) {
                 const text = event.target.result;
                 const rows = text.split('\n').map(row => row.trim()).filter(row => row);
+                
+                if (rows.length < 2) {
+                    errorDiv.textContent = "Invalid CSV format: At least one data row is required.";
+                    return;
+                }
+
                 const headers = rows[0].split(',');
-                jsonData = rows.slice(1).map(row => {
+                
+                if (headers.length === 0) {
+                    errorDiv.textContent = "Invalid CSV format: No headers found.";
+                    return;
+                }
+                
+                jsonData = rows.slice(1).map((row, rowIndex) => {
                     const values = row.split(',');
+                    if (values.length !== headers.length) {
+                        errorDiv.textContent = `Invalid CSV format: Row ${rowIndex + 1} has incorrect number of columns.`;
+                        jsonData = null;
+                        return null;
+                    }
                     return headers.reduce((obj, header, index) => {
                         obj[header] = values[index] || "";
                         return obj;
                     }, {});
-                });
+                }).filter(row => row !== null);
+
+                if (jsonData.length === 0) {
+                    errorDiv.textContent = "No valid data rows found.";
+                    jsonData = null;
+                    return;
+                }
 
                 output.textContent = JSON.stringify(jsonData, null, 2);
             };
@@ -62,8 +93,9 @@
         }
 
         function downloadJson() {
+            const errorDiv = document.getElementById('error');
             if (!jsonData) {
-                alert("No JSON data available. Convert a CSV file first.");
+                errorDiv.textContent = "No JSON data available. Convert a CSV file first.";
                 return;
             }
 
